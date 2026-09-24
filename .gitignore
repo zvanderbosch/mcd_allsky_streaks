@@ -2,4 +2,4 @@
 data/*.fits
 
 # Ignore pycache dir
-__pycache__/*
+src/__pycache__/*
