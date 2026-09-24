@@ -1,5 +1,9 @@
 """Script used to test-run the image processing routines"""
 
+# Add src directory to path
+import sys
+sys.path.insert(0, "./src")
+
 from process_image import ImageIO
 from astropy.visualization import PercentileInterval
 
