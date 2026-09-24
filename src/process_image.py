@@ -2,7 +2,7 @@
 
 This script will process and analyze all-sky fisheye images
 to detect streaks from satellites and potentially from other 
-artificial and natural sources like planes, meteors, & NEOs.
+artificial and natural sources (e.g. planes, meteors, NEOs).
 
 Usage:
     TBD
@@ -44,7 +44,6 @@ class ImageData:
 
 class ImageIO:
 
-
     @staticmethod
     def load(source: str | Path) -> ImageData:
         """
@@ -71,7 +70,6 @@ class ImageIO:
             path=fits_source
         )
     
-
     @staticmethod
     def create(
         data: np.ndarray,
@@ -85,8 +83,11 @@ class ImageIO:
         
         # Save to file if a path is given
         if save_to:
+            if isinstance(header,dict):
+                header = fits.Header(header)
+            newHDU = fits.PrimaryHDU(data=data, header=header)
+            newHDU.writeto(save_to, overwrite=True)
             print(f'Saved to FITS file: {save_to}')
-            # Need to add in actual save logic here
         
         return ImageData(
             data=data,

@@ -24,8 +24,9 @@ image2 = ImageIO.load(fitsFile2)
 
 
 # Take image difference and create new ImageData object
+diffimPath = f"{DIRS['data']}/diffim.fits"
 diffimage = ImageIO.create(
     data=image1.data-image2.data,
     header=image2.header,
-    save_to='path/to/save/file'
+    save_to=diffimPath
 )
