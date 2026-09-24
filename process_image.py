@@ -39,15 +39,17 @@ class ImageData:
 
     data: np.ndarray
     header: Mapping[str, Any]
-    path: str
+    path: str | None
 
 
-class ImageLoader(object):
+class ImageIO:
 
 
-    # Image loading function
-    def load(self, source: str | Path) -> ImageData:
-        """Load primary-HDU image data and header for one FITS file."""
+    @staticmethod
+    def load(source: str | Path) -> ImageData:
+        """
+        Load primary-HDU image data and header for one FITS file.
+        """
 
         # Get path to FITS file
         fits_source = str(source)
@@ -70,8 +72,24 @@ class ImageLoader(object):
         )
     
 
-
-def load_image(fitsFile: str | Path) -> ImageData:
-    """Load a FITS file."""
-
-    return ImageLoader().load(fitsFile)
+    @staticmethod
+    def create(
+        data: np.ndarray,
+        header: Mapping[str, Any],
+        save_to: str | Path | None = None
+    ) -> ImageData:
+        """
+        Create new ImageData object from provided data + header,
+        optionally save to a FITS file.
+        """
+        
+        # Save to file if a path is given
+        if save_to:
+            print(f'Saved to FITS file: {save_to}')
+            # Need to add in actual save logic here
+        
+        return ImageData(
+            data=data,
+            header=header,
+            path=save_to
+        )
