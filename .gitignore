@@ -1,2 +1,5 @@
 # Ignore FITS files in data directory
 data/*.fits
+
+# Ignore pycache dir
+__pycache__/*
