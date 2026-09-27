@@ -13,14 +13,17 @@ Last Updated:
 """
 
 import os
+import json
 import subprocess
 import numpy as np
+import astropy.units as u
 
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Mapping
 from astropy.io import fits
 from astropy.table import Table
+from astropy.coordinates import SkyCoord
 from astropy.stats import sigma_clipped_stats
 from photutils.detection import DAOStarFinder
 
@@ -191,12 +194,113 @@ class PlateSolve:
             '--scale-err', '10.0', # percent
             '--calibrate', calibFile,
             '--wcs', wcsFile,
-            '--solve-time', '30.0'
+            '--solve-time', '30.0',
+            '--crpix-center'
         ]
         response = subprocess.run(cmd, timeout=None)
         if response.check_returncode():
             print(f'ERROR: Return code {response.returncode} from Astrometry.net API')
-            return None
+            return None, None
         else:
-            return wcsFile
+            return wcsFile, calibFile
 
+    @staticmethod
+    def updateFITSHeader(
+            imageFile: str | Path,
+            wcsFile: str | Path | None,
+            calibFile: str | Path | None
+    ) -> str | Path:
+        """
+        Function that updates a FITS image file's header with
+        the WCS info contained in the provided WCS header file.
+
+        Parameters:
+        -----------
+        imageFile: str | Path
+            Path to FITS image file
+        wcsFile: str | Path | None
+            Path to FITS WCS file. If None, assumes plate solving failed.
+        calibFile: str | Path | None
+            Path to JSON calibration file. If None, assumes plate solving failed.
+
+        Returns:
+        --------
+        imageFile: str | Path
+            Return path to updated FITS image file, same as the input file.
+        """
+
+        # WCS Solution FITS header keys to save into image headers
+        wcsKeys = [
+            'WCSAXES', 'CTYPE1', 'CTYPE2','EQUINOX','LONPOLE','LATPOLE',
+            'CRVAL1','CRVAL2','CRPIX1','CRPIX2','CUNIT1','CUNIT2',
+            'CD1_1','CD1_2','CD2_1','CD2_2',
+            'A_ORDER','A_0_0','A_0_1','A_0_2','A_1_0','A_1_1','A_2_0',
+            'B_ORDER','B_0_0','B_0_1','B_0_2','B_1_0','B_1_1','B_2_0',
+            'AP_ORDER','AP_0_0','AP_0_1','AP_0_2','AP_1_0','AP_1_1','AP_2_0',
+            'BP_ORDER','BP_0_0','BP_0_1','BP_0_2','BP_1_0','BP_1_1','BP_2_0'
+        ]
+
+        # If wcsFile is not present, add keyword to indicate solution failed
+        if (wcsFile is None) or (calibFile is None):
+            with fits.open(imageFile, mode='update') as hdul:
+                hdul[0].header['PLTSOLVD'] = (False, 'Astrometric solution solved')
+                hdul.flush()
+            return imageFile
+        
+        # Load the WCS FITS headers
+        with fits.open(wcsFile) as hdul:
+            wcsHDR = hdul[0].header
+
+        # Create coordinate object using CRVAL values
+        imgCoord = SkyCoord(
+            ra=wcsHDR['CRVAL1']*u.deg,
+            dec=wcsHDR['CRVAL2']*u.deg,
+            frame='icrs'
+        )
+
+        # Get pixel scale from the calibration file
+        with open(calibFile) as js:
+            calib = json.load(js)
+        pixscale = calib['pixscale'] # [arcsec/pix] platescale
+
+        # Update the image FITS header
+        with fits.open(imageFile, uint=False, mode='update') as hdul:
+            imgHDR = hdul[0].header
+            imgHDR['PLTSOLVD'] = (True, 'Astrometric solution solved')
+            for key in wcsKeys:
+                if key not in list(wcsHDR.keys()):
+                    continue
+                imgHDR[key] = (wcsHDR[key], wcsHDR.comments[key])
+
+            # Add RA and DEC values to the header
+            imgHDR.set(
+                'RA',
+                imgCoord.ra.to_string(unit='hour',sep=':',precision=2),
+                'Right Ascension at image center',
+                before='WCSAXES'
+            )
+            imgHDR.set(
+                'DEC',
+                imgCoord.dec.to_string(unit='deg',sep=':',precision=2),
+                'Declintation at image center',
+                before='WCSAXES'
+            )
+            
+            # Add pixel scale to header values
+            imgHDR.set(
+                'PIXSCALE', 
+                pixscale, 
+                '[deg/pixel] plate scale', 
+                before='WCSAXES'
+            )
+
+            # Add history
+            if 'HISTORY' not in imgHDR:
+                imgHDR['HISTORY'] = 'WCS created using the Astrometry.net suite'
+                imgHDR['HISTORY'] = wcsHDR['HISTORY'][1]
+                imgHDR['HISTORY'] = wcsHDR['HISTORY'][2]
+
+            # Flush changes to file
+            hdul.flush()
+
+        return imageFile

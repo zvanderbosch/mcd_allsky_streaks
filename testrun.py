@@ -54,10 +54,19 @@ for ring in range(numrings):
             )
 
             # Get source XY positions
-            sourceFileXY = PlateSolve.findStars(stampImage)
+            sourceFileXY = PlateSolve.findStars(
+                stampImage
+            )
 
             # Plate solve using source XY positions
-            responseCode = PlateSolve.solveWithANetOnline(sourceFileXY,cs,cs)
+            wcsPath, calibPath = PlateSolve.solveWithANetOnline(
+                sourceFileXY, cs, cs
+            )
+
+            # Update the saved FITS file
+            _ = PlateSolve.updateFITSHeader(
+                stampImage.path, wcsPath, calibPath
+            )
 
 
 # Take image difference and create new ImageData object
