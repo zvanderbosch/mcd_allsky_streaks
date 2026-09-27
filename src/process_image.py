@@ -24,6 +24,10 @@ from astropy.table import Table
 from astropy.stats import sigma_clipped_stats
 from photutils.detection import DAOStarFinder
 
+# Local imports
+import filepaths as fp
+import printcolors as pc
+
 
 @dataclass(frozen=True)
 class ImageData:
@@ -165,22 +169,28 @@ class PlateSolve:
             Return code from subprocess
         """
         
+        # Get the working directory and base filename
+        xyFile = str(xyFile)
         astDir = "/".join(xyFile.split("/")[0:-1])
         fileBase = xyFile.split("/")[-1].split(".")[0]
+
+        # Define paths to output files
+        wcsFile = f'{astDir}/{fileBase}_wcs.fits'
+        calibFile = f'{astDir}/{fileBase}_calib.txt'
 
         # Plate solve using Astrometry.net client (anet_client.py)
         cmd = [
             'python', '/home/zach/HET/mcd_allsky_streaks/src/anet_client.py', 
-            '--apikey', 'kdvqtjbqkbkbuyzb',
-            '--upload-xy', f'{xyFile}',
+            '--apikey', fp.anetAPIKey,
+            '--upload-xy', xyFile,
             '--parity', '2',
             '--image-width', f'{xsize}',
             '--image-height', f'{ysize}',
             '--scale-units', 'arcsecperpix',
             '--scale-est', '70.0',
             '--scale-err', '10.0', # percent
-            '--calibrate', f'{astDir}/{fileBase}_calib.txt',
-            '--wcs', f'{astDir}/{fileBase}_wcs.fits',
+            '--calibrate', calibFile,
+            '--wcs', wcsFile,
             '--solve-time', '30.0'
         ]
         response = subprocess.run(cmd, timeout=None)
