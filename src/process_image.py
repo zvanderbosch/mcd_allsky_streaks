@@ -147,7 +147,7 @@ class PlateSolve:
         xyFile: str | Path,
         xsize: int,
         ysize: int
-    ):
+    ) -> str | None:
         """
         Function that sends a list of XY pixel coordinates for
         detected objects, along with the image X and Y extentz,
@@ -165,8 +165,8 @@ class PlateSolve:
 
         Returns:
         --------
-        response.returncode: int
-            Return code from subprocess
+        wcsFile: str | None
+            Path to downloaded wcs header file, or None if solving failed
         """
         
         # Get the working directory and base filename
@@ -196,6 +196,7 @@ class PlateSolve:
         response = subprocess.run(cmd, timeout=None)
         if response.check_returncode():
             print(f'ERROR: Return code {response.returncode} from Astrometry.net API')
-            
-        return response.returncode
+            return None
+        else:
+            return wcsFile
 
