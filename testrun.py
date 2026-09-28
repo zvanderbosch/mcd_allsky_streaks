@@ -4,18 +4,16 @@ import sys
 sys.path.insert(0, "./src")
 
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-import matplotlib.colors as mcolors
 
 from glob import glob
-from astropy.visualization import PercentileInterval
+from functools import partial
+from multiprocessing import Pool
 
 # Local imports
 import filepaths as fp
 import printcolors as pc
 from process_image import ImageIO
-from process_image import PlateSolve
+from process_image import fullPlateSolveANet
 
 
 # Load the raw FITS images
@@ -26,12 +24,13 @@ image2 = ImageIO.load(fitsFile2)
 
 
 # Divide the original images into a grid of smaller images
-cs = 256  # crop size for stamps in pixel units
-numrings = 1
+cs = 512  # crop size for stamps in pixel units
+numrings = 3
 ydim,xdim = image1.data.shape
 xcen = np.floor(xdim/2)+1
 ycen = np.floor(ydim/2)+1
 
+rawStamps = []
 for ring in range(numrings):
     for xshift in range(-ring,ring+1):
         for yshift in range(-ring,ring+1):
@@ -46,27 +45,27 @@ for ring in range(numrings):
             stampXcen = xcen + xshift*cs
             stampYcen = ycen + yshift*cs
             stampImage = ImageIO.create(
-                data = image2.data[
+                data=image2.data[
                     int(stampYcen-cs/2):int(stampYcen+cs/2),
                     int(stampXcen-cs/2):int(stampXcen+cs/2)
                 ],
                 save_to=stampPath
             )
+            rawStamps.append(stampImage)
 
-            # Get source XY positions
-            sourceFileXY = PlateSolve.findStars(
-                stampImage
-            )
 
-            # Plate solve using source XY positions
-            wcsPath, calibPath = PlateSolve.solveWithANetOnline(
-                sourceFileXY, cs, cs
-            )
+# Solve all images, using multiprocessing
+solvedStamps = []
+partialSolver = partial(
+    fullPlateSolveANet, 
+    useExistingSolve=True,
+    plotImage=True
+)
+with Pool(processes=fp.numThreads) as pool:
+    results = pool.imap_unordered(partialSolver,rawStamps)
+    for res in results:
+        solvedStamps.append(res)
 
-            # Update the saved FITS file
-            _ = PlateSolve.updateFITSHeader(
-                stampImage.path, wcsPath, calibPath
-            )
 
 
 # Take image difference and create new ImageData object
