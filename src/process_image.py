@@ -17,14 +17,17 @@ import json
 import subprocess
 import numpy as np
 import astropy.units as u
+import matplotlib.pyplot as plt
 
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Mapping
 from astropy.io import fits
+from astropy.wcs import WCS
 from astropy.table import Table
 from astropy.coordinates import SkyCoord
 from astropy.stats import sigma_clipped_stats
+from astropy.visualization import PercentileInterval
 from photutils.detection import DAOStarFinder
 
 # Local imports
@@ -56,7 +59,7 @@ class ImageIO:
         
         # Open FITS file and retrieve data/header
         with fits.open(fits_source, memmap=False) as hdul:
-            header = dict(hdul[0].header)
+            header = hdul[0].header
             data = np.array(hdul[0].data, copy=True).astype(np.float64)
 
         # Check that data is not empty
@@ -97,7 +100,6 @@ class ImageIO:
             path=save_to
         )
     
-
 
 class PlateSolve:
     """Utilities for plate solving all-sky images"""
@@ -149,7 +151,8 @@ class PlateSolve:
     def solveWithANetOnline(
         xyFile: str | Path,
         xsize: int,
-        ysize: int
+        ysize: int,
+        useExisting: bool = False
     ) -> str | None:
         """
         Function that sends a list of XY pixel coordinates for
@@ -165,6 +168,8 @@ class PlateSolve:
             Image width (pixels)
         ysize: int
             Image height (pixels)
+        useExisting: bool
+            Use existing astrometry.net solutions (default = False)
 
         Returns:
         --------
@@ -180,6 +185,11 @@ class PlateSolve:
         # Define paths to output files
         wcsFile = f'{astDir}/{fileBase}_wcs.fits'
         calibFile = f'{astDir}/{fileBase}_calib.txt'
+
+        # Use existing solution if desired
+        if useExisting:
+            if os.path.isfile(wcsFile) and os.path.isfile(calibFile):
+                return wcsFile, calibFile
 
         # Plate solve using Astrometry.net client (anet_client.py)
         cmd = [
@@ -304,3 +314,137 @@ class PlateSolve:
             hdul.flush()
 
         return imageFile
+
+
+def fullPlateSolveANet(
+        image: ImageData,
+        useExistingSolve: bool = False,
+        plotImage: bool = False
+) -> ImageData:
+    """
+    A convenience function that executes multiple steps needed
+    for plate solving an image using Astrometry.net online.
+
+    1) Detect sources, output positions to FITS table file
+    2) Submit source positions and image dimensions to Astrometry.net
+       for plate solving, downloading the results when finished.
+    3) Update the original image header with WCS header info.
+    4) Load and return the updated image.
+
+    Parameters:
+    -----------
+    image: ImageData
+        Image to be plate solved.
+    useExistingSolve: bool
+        Use existing astrometry.net solutions (default = False)
+    plotImage: bool
+        WHether to save a plot of the solved image (default = False)
+
+    Returns:
+    --------
+    imageSolved: ImageData
+        Same image provided as input, but with header updated to
+        include the results of the plate solution. If plate solving
+        succeeded, header will contain many new WCS keywords. If 
+        plate solving failed, only the header value PLTSOLVD = F
+        will be added to indicate the plate solving failed.
+    """
+
+    # Get image name
+    imgName = image.path.split('/')[-1]
+
+    # Define print status prefix
+    funcName = 'fullPlateSolveANet'
+    prefix = f'{pc.GREEN}{funcName:19s}{pc.END}: '
+
+    # Get image dimensions
+    ny,nx = image.data.shape
+
+    # Get source XY positions
+    print(f"{prefix}(Status = Detecting sources) {imgName}")
+    sourceFileXY = PlateSolve.findStars(image)
+
+    # Plate solve using source XY positions
+    print(f"{prefix}(Status = Plate solving) {imgName}")
+    wcsPath, calibPath = PlateSolve.solveWithANetOnline(
+        sourceFileXY, nx, ny, useExisting=useExistingSolve
+    )
+
+    # Update the saved FITS file
+    print(f"{prefix}(Status = Updating FITS header) {imgName}")
+    _ = PlateSolve.updateFITSHeader(
+        image.path, wcsPath, calibPath
+    )
+
+    # Load in the updated FITS image
+    print(f"{prefix}(Status = Loading solved image) {imgName}")
+    imageSolved = ImageIO.load(image.path)
+
+    # Plot stamp image
+    if plotImage:
+        print(f"{prefix}(Status = Plotting image) {imgName}")
+
+        # Generate filename for the saved figure
+        figFile = f'{image.path.split(".")[0]}.png'
+
+        # Get metadata from image file name
+        ringnum = int(imgName.split("_")[1].strip("r"))
+        xyshift = imgName.split("_")[2]
+        if xyshift[0] == 'p':
+            xshift = int(imgName.split("_")[2][1:3])
+        else:
+            xshift = -int(imgName.split("_")[2][1:3])
+        if xyshift[3] == 'p':
+            yshift = int(imgName.split("_")[2][4:6])
+        else:
+            yshift = -int(imgName.split("_")[2][4:6])
+
+        # Define image scaling object
+        piv = PercentileInterval(90.)
+
+        # Generate WCS object is PLTSOLVD = True
+        plateSolved = imageSolved.header['PLTSOLVD']
+        if plateSolved:
+            wcs = WCS(imageSolved.header)
+            fig, ax = plt.subplots(
+                figsize=(10,10),
+                subplot_kw=dict(projection=wcs)
+            )
+        else:
+            fig, ax = plt.subplots(
+                figsize=(10,10)
+            )
+        
+        # Plot the image
+        vmin,vmax = piv.get_limits(imageSolved.data)
+        ax.imshow(imageSolved.data,vmin=vmin,vmax=vmax,cmap='Greys_r')
+
+        # Add grid
+        ax.grid(ls='-',color='indianred',lw=1.5)
+
+        # Add title
+        pltTitle = (
+            f"{image.path.split('/')[-1]} "
+            f"(PLTSOLVD = {plateSolved})\n"
+            f"{nx}x{ny} Stamp for Ring {ringnum}, "
+            f"X-shift {xshift:+d}, "
+            f"Y-shift {yshift:+d}"
+        )
+        ax.set_title(pltTitle,fontsize=18)
+
+        # Change axis labels
+        if 'ra' in ax.get_xlabel():
+            ax.set_xlabel('Right Ascension', fontsize=14)
+            ax.set_ylabel('Declination', fontsize=14)
+        elif 'ra' in ax.get_ylabel():
+            ax.set_xlabel('Declination', fontsize=14)
+            ax.set_ylabel('Right Ascension', fontsize=14)
+        else:
+            ax.set_xlabel('X (pixels)', fontsize=14)
+            ax.set_ylabel('Y (pixels)', fontsize=14)
+
+        # Save figure
+        plt.savefig(figFile, dpi=200, bbox_inches='tight')
+        plt.close()
+
+    return imageSolved
