@@ -8,7 +8,7 @@ Author:
     Z. Vanderbosch (HET)
 
 Last Updated:
-    2026 Sept 25
+    2026 Sept 28
 
 """
 
@@ -356,28 +356,25 @@ def fullPlateSolveANet(
     # Define print status prefix
     funcName = 'fullPlateSolveANet'
     prefix = f'{pc.GREEN}{funcName:19s}{pc.END}: '
+    print(f"{prefix}(Status = Plate solving) {imgName}")
 
     # Get image dimensions
     ny,nx = image.data.shape
 
     # Get source XY positions
-    print(f"{prefix}(Status = Detecting sources) {imgName}")
     sourceFileXY = PlateSolve.findStars(image)
 
     # Plate solve using source XY positions
-    print(f"{prefix}(Status = Plate solving) {imgName}")
     wcsPath, calibPath = PlateSolve.solveWithANetOnline(
         sourceFileXY, nx, ny, useExisting=useExistingSolve
     )
 
     # Update the saved FITS file
-    print(f"{prefix}(Status = Updating FITS header) {imgName}")
     _ = PlateSolve.updateFITSHeader(
         image.path, wcsPath, calibPath
     )
 
     # Load in the updated FITS image
-    print(f"{prefix}(Status = Loading solved image) {imgName}")
     imageSolved = ImageIO.load(image.path)
 
     # Plot stamp image
@@ -386,6 +383,10 @@ def fullPlateSolveANet(
 
         # Generate filename for the saved figure
         figFile = f'{image.path.split(".")[0]}.png'
+
+        # Load source positions used for solving
+        with fits.open(sourceFileXY) as hdul:
+            sourceTable = hdul[1].data
 
         # Get metadata from image file name
         ringnum = int(imgName.split("_")[1].strip("r"))
@@ -400,24 +401,31 @@ def fullPlateSolveANet(
             yshift = -int(imgName.split("_")[2][4:6])
 
         # Define image scaling object
-        piv = PercentileInterval(90.)
+        piv = PercentileInterval(95.)
 
         # Generate WCS object is PLTSOLVD = True
         plateSolved = imageSolved.header['PLTSOLVD']
         if plateSolved:
             wcs = WCS(imageSolved.header)
-            fig, ax = plt.subplots(
+            _,ax = plt.subplots(
                 figsize=(10,10),
                 subplot_kw=dict(projection=wcs)
             )
         else:
-            fig, ax = plt.subplots(
+            _,ax = plt.subplots(
                 figsize=(10,10)
             )
         
         # Plot the image
         vmin,vmax = piv.get_limits(imageSolved.data)
         ax.imshow(imageSolved.data,vmin=vmin,vmax=vmax,cmap='Greys_r')
+
+        # Plot detected sources
+        ax.scatter(
+            sourceTable.x,
+            sourceTable.y,
+            marker='o', fc='None', ec='c', s=125, lw=2
+        )
 
         # Add grid
         ax.grid(ls='-',color='indianred',lw=1.5)
