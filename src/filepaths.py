@@ -9,6 +9,9 @@ Author:
 # Astrometry.net API key
 anetAPIKey = 'kdvqtjbqkbkbuyzb'
 
+# Number of threads for multiprocessing
+numThreads = 4
+
 # Base directory
 baseDir = '/home/zach/HET'
 
