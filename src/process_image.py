@@ -1,4 +1,5 @@
-"""All-sky image processing routines
+"""
+All-sky image processing routines
 
 This script will process and analyze all-sky fisheye images
 to detect streaks from satellites and potentially from other 
@@ -8,7 +9,7 @@ Author:
     Z. Vanderbosch (HET)
 
 Last Updated:
-    2026 Sept 28
+    2026 Sept 29
 
 """
 
@@ -33,6 +34,9 @@ from photutils.detection import DAOStarFinder
 # Local imports
 import filepaths as fp
 import printcolors as pc
+
+# Fall back to XCB to avoid QT5 wayland warnings
+os.environ["QT_QPA_PLATFORM"] = "xcb"
 
 # Define print status prefix
 scriptName = 'process_image.py'
