@@ -45,6 +45,7 @@ class ImageData:
 
 
 class ImageIO:
+    """Utilities for various FITS image IO tasks"""
 
     @staticmethod
     def load(source: str | Path) -> ImageData:
@@ -176,6 +177,10 @@ class PlateSolve:
         wcsFile: str | None
             Path to downloaded wcs header file, or None if solving failed
         """
+
+        # Define print status prefix
+        funcName = 'solveWithANetOnline'
+        prefix = f'{pc.GREEN}{funcName:19s}{pc.END}: '
         
         # Get the working directory and base filename
         xyFile = str(xyFile)
@@ -204,15 +209,17 @@ class PlateSolve:
             '--scale-err', '10.0', # percent
             '--calibrate', calibFile,
             '--wcs', wcsFile,
-            '--solve-time', '30.0',
+            '--solve-time', '120.0',
             '--crpix-center'
         ]
-        response = subprocess.run(cmd, timeout=None)
-        if response.check_returncode():
-            print(f'ERROR: Return code {response.returncode} from Astrometry.net API')
+        try:
+            response = subprocess.run(cmd, timeout=None)
+            response.check_returncode()
+        except:
+            print(f'{prefix}{pc.RED}ERROR{pc.END}: Return code {response.returncode} from Astrometry.net API')
             return None, None
-        else:
-            return wcsFile, calibFile
+        
+        return wcsFile, calibFile
 
     @staticmethod
     def updateFITSHeader(
@@ -356,7 +363,7 @@ def fullPlateSolveANet(
     # Define print status prefix
     funcName = 'fullPlateSolveANet'
     prefix = f'{pc.GREEN}{funcName:19s}{pc.END}: '
-    print(f"{prefix}(Status = Plate solving) {imgName}")
+    print(f"{prefix}Starting plate solving for {imgName}")
 
     # Get image dimensions
     ny,nx = image.data.shape
@@ -379,7 +386,7 @@ def fullPlateSolveANet(
 
     # Plot stamp image
     if plotImage:
-        print(f"{prefix}(Status = Plotting image) {imgName}")
+        print(f"{prefix}Generating figure for {imgName}")
 
         # Generate filename for the saved figure
         figFile = f'{image.path.split(".")[0]}.png'
@@ -427,8 +434,9 @@ def fullPlateSolveANet(
             marker='o', fc='None', ec='c', s=125, lw=2
         )
 
-        # Add grid
-        ax.grid(ls='-',color='indianred',lw=1.5)
+        # Add grid for plate solved images only
+        if plateSolved:
+            ax.grid(ls='-',color='indianred',lw=1.5)
 
         # Add title
         pltTitle = (
