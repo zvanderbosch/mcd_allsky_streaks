@@ -34,6 +34,10 @@ from photutils.detection import DAOStarFinder
 import filepaths as fp
 import printcolors as pc
 
+# Define print status prefix
+scriptName = 'process_image.py'
+PREFIX = f'{pc.GREEN}{scriptName:19s}{pc.END}: '
+
 
 @dataclass(frozen=True)
 class ImageData:
@@ -83,6 +87,10 @@ class ImageIO:
         Create new ImageData object from provided data + header,
         optionally save to a FITS file.
         """
+
+        # Define print status prefix
+        funcName = 'ImageIO.create'
+        funcPrefix = f'{PREFIX}({pc.ORANGE}{funcName}{pc.END}) '
         
         # Save to file if a path is given
         if save_to:
@@ -93,7 +101,7 @@ class ImageIO:
             else:
                 newHDU = fits.PrimaryHDU(data=data)
             newHDU.writeto(save_to, overwrite=True)
-            print(f'Saved to FITS file: {save_to}')
+            print(f"{funcPrefix}Saved image to FITS file: {save_to.split('/')[-1]}")
         
         return ImageData(
             data=data,
@@ -179,8 +187,8 @@ class PlateSolve:
         """
 
         # Define print status prefix
-        funcName = 'solveWithANetOnline'
-        prefix = f'{pc.GREEN}{funcName:19s}{pc.END}: '
+        funcName = 'PlateSolve.solveWithANetOnline'
+        funcPrefix = f'{PREFIX}({pc.ORANGE}{funcName}{pc.END}) '
         
         # Get the working directory and base filename
         xyFile = str(xyFile)
@@ -213,10 +221,11 @@ class PlateSolve:
             '--crpix-center'
         ]
         try:
+            print(f'{funcPrefix}Sending Astrometry.net command for {xyFile.split("/")[-1]}')
             response = subprocess.run(cmd, timeout=None)
             response.check_returncode()
         except:
-            print(f'{prefix}{pc.RED}ERROR{pc.END}: Return code {response.returncode} from Astrometry.net API')
+            print(f'{funcPrefix}{pc.RED}ERROR{pc.END}: Return code {response.returncode} from Astrometry.net API')
             return None, None
         
         return wcsFile, calibFile
@@ -362,8 +371,8 @@ def fullPlateSolveANet(
 
     # Define print status prefix
     funcName = 'fullPlateSolveANet'
-    prefix = f'{pc.GREEN}{funcName:19s}{pc.END}: '
-    print(f"{prefix}Starting plate solving for {imgName}")
+    funcPrefix = f'{PREFIX}({pc.ORANGE}{funcName}{pc.END}) '
+    print(f"{funcPrefix}Starting plate solving for {imgName}")
 
     # Get image dimensions
     ny,nx = image.data.shape
@@ -386,7 +395,7 @@ def fullPlateSolveANet(
 
     # Plot stamp image
     if plotImage:
-        print(f"{prefix}Generating figure for {imgName}")
+        print(f"{funcPrefix}Generating figure for {imgName}")
 
         # Generate filename for the saved figure
         figFile = f'{image.path.split(".")[0]}.png'
