@@ -1,6 +1,10 @@
 # Ignore FITS files in data directory
+data/*.png
 data/*.fits
 data/stamps/*
 
 # Ignore pycache dir
 src/__pycache__/*
+
+# Ignore VSCode directory
+.vscode/*
