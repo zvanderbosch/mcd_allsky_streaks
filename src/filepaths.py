@@ -10,7 +10,7 @@ Author:
 anetAPIKey = 'kdvqtjbqkbkbuyzb'
 
 # Number of threads for multiprocessing
-numThreads = 4
+numThreads = 5
 
 # Base directory
 baseDir = '/home/zach/HET'
