@@ -1,4 +1,12 @@
-"""Script used to test-run the image processing routines"""
+"""
+Script used to test-run the image processing routines
+
+Author:
+    Z. Vanderbosch (HET)
+
+Last Updated:
+    2026 Sept 29
+"""
 
 import sys
 sys.path.insert(0, "./src")

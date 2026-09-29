@@ -1,23 +1,14 @@
-#-----------------------------------------------------------------------------#
-#print_colors.py
-#
-#NPS Night Skies Program
-#
-#Last updated: 2025/02/06
-#
-#This script defines some colors used when printing status
-#report to the command line during pipeline execution
-#
-#Input: 
-#   None
-#
-#Output:
-#   None
-#
-#History:
-#   Zach Vanderbosch -- Created file 2025/02/06
-#
-#-----------------------------------------------------------------------------#
+"""
+
+This script defines some colors used when printing status
+reports to the command line.
+
+Author:
+    Z. Vanderbosch (HET)
+
+Last Updated:
+    2026 Sept 29
+"""
 
 MAGENTA = '\033[95m'
 BLUE = '\033[94m'

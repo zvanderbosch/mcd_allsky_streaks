@@ -1,9 +1,12 @@
 """
-Script storing various filepaths and API keys
+Script storing various filepaths, API keys, 
+and default settings
 
 Author:
     Z. Vanderbosch (HET)
 
+Last Updated:
+    2026 Sept 29
 """
 
 # Astrometry.net API key
