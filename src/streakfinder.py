@@ -11,6 +11,12 @@ Last Updated:
     2026 Sept 29
 """
 
+import numpy as np
+
+from skimage.feature import canny
+from skimage.transform import hough_line
+from skimage.transform import hough_line_peaks
+
 # Local imports
 from imageproc import ImageData
 
@@ -20,4 +26,53 @@ class streakFinding:
     Utilities for streak detections
     """
 
-    
+    def houghStreakDetect(
+            image: ImageData,
+            edgeSigma: float = 3.0,
+            edgeLowThreshold: float | None = 10.,
+            edgeHighThreshold: float | None = 20.
+    ):
+        """
+        Streak detection using Hough transform
+
+        Parameters:
+        -----------
+        edgeSigma: float
+            StDev of gaussian used for image smoothing before edge detection
+        edgeLowThreshold: float
+            Lower bound for hysteresis thresholding (edge linking)
+        edgeHighThreshold: float
+            Upper bound for hysteresis thresholding (edge linking)
+        """
+
+        # Perform edge detections
+        edges = canny(
+            image.data, 
+            sigma=edgeSigma, 
+            low_threshold=edgeLowThreshold, 
+            high_threshold=edgeHighThreshold
+        )
+
+        # Generate array of test angle from -90 to +90 deg with 0.5-deg steps
+        testAngles = np.linspace(-np.pi/2, np.pi/2, 360, endpoint=False)
+
+        # Classic straight-line Hough transform
+        houghSpace, theta, distance = hough_line(
+            edges, theta=testAngles
+        )
+
+        # Detect peaks in the Hough transform sinogram
+        sum, angles, dists = hough_line_peaks(
+            houghSpace, 
+            theta, 
+            distance
+        )
+
+        # Package results into dict
+        houghResults = {
+            'hough_accum': sum,
+            'hough_theta': angles,
+            'hough_dist': dists
+        }
+
+        return houghResults
