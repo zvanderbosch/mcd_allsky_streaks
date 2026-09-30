@@ -39,7 +39,7 @@ import printcolors as pc
 os.environ["QT_QPA_PLATFORM"] = "xcb"
 
 # Define print status prefix
-scriptName = 'process_image.py'
+scriptName = 'imageproc.py'
 PREFIX = f'{pc.GREEN}{scriptName:19s}{pc.END}: '
 
 
