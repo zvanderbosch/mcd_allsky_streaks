@@ -19,7 +19,7 @@ from skimage.transform import hough_line_peaks
 
 # Local imports
 from imageproc import ImageData
-from pyradon.src.finder import Finder
+from pyradon.finder import Finder
 
 
 class streakFinding:
