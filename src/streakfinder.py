@@ -31,7 +31,7 @@ class streakFinding:
             edgeSigma: float = 3.0,
             edgeLowThreshold: float | None = 10.,
             edgeHighThreshold: float | None = 20.
-    ):
+    ) -> dict:
         """
         Streak detection using Hough transform
 
