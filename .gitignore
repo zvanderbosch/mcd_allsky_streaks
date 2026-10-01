@@ -5,6 +5,7 @@ data/stamps/*
 
 # Ignore pycache dir
 src/__pycache__/*
+src/pyradon/__pycache__/*
 
 # Ignore VSCode directory
 .vscode/*
