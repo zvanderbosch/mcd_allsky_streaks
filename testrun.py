@@ -43,78 +43,89 @@ image2 = ImageIO.load(fitsFile2)
 
 # Divide the original images into a grid of smaller images
 cs = 512  # crop size for stamps in pixel units
-numrings = 6
+numrings = 3
 ydim,xdim = image1.data.shape
 xcen = np.floor(xdim/2)+1
 ycen = np.floor(ydim/2)+1
 
-rawStamps1 = []
-rawStamps2 = []
-diffStamps = []
-solvedStamps = []
-for ring in range(numrings):
-    for xshift in range(-ring,ring+1):
-        for yshift in range(-ring,ring+1):
+# Generate difference image stamps
+diffStamps = ImageIO.makeStamps(
+    image1,
+    image2,
+    stampSize=cs,
+    numRings=numrings,
+    diffType="2-1",
+    xyCenter=(xcen,ycen),
+    saveStamps=True
+)
 
-            # Make sure the shift belongs to the given ring
-            if (abs(xshift) < ring) and (abs(yshift) < ring):
-                continue
+# rawStamps1 = []
+# rawStamps2 = []
+# diffStamps = []
+# solvedStamps = []
+# for ring in range(numrings):
+#     for xshift in range(-ring,ring+1):
+#         for yshift in range(-ring,ring+1):
 
-            # Get file names for each stamp
-            stampPath1 = f"{fp.dataDir}/stamps/stamp_r{ring:02d}_{xshift:+03d}{yshift:+03d}_1.fits"
-            stampPath2 = f"{fp.dataDir}/stamps/stamp_r{ring:02d}_{xshift:+03d}{yshift:+03d}_2.fits"
-            stampPath1 = stampPath1.replace("-","m").replace("+","p")
-            stampPath2 = stampPath2.replace("-","m").replace("+","p")
+#             # Make sure the shift belongs to the given ring
+#             if (abs(xshift) < ring) and (abs(yshift) < ring):
+#                 continue
 
-            # Create new ImageData object for stamp
-            stampXcen = xcen + xshift*cs
-            stampYcen = ycen + yshift*cs
-            stampImage1 = ImageIO.create(
-                data=image1.data[
-                    int(stampYcen-cs/2):int(stampYcen+cs/2),
-                    int(stampXcen-cs/2):int(stampXcen+cs/2)
-                ],
-                #save_to=stampPath1
-            )
-            stampImage2 = ImageIO.create(
-                data=image2.data[
-                    int(stampYcen-cs/2):int(stampYcen+cs/2),
-                    int(stampXcen-cs/2):int(stampXcen+cs/2)
-                ],
-                #save_to=stampPath2
-            )
-            rawStamps1.append(stampImage1)
-            rawStamps2.append(stampImage2)
+#             # Get file names for each stamp
+#             stampPath1 = f"{fp.dataDir}/stamps/stamp_r{ring:02d}_{xshift:+03d}{yshift:+03d}_1.fits"
+#             stampPath2 = f"{fp.dataDir}/stamps/stamp_r{ring:02d}_{xshift:+03d}{yshift:+03d}_2.fits"
+#             stampPath1 = stampPath1.replace("-","m").replace("+","p")
+#             stampPath2 = stampPath2.replace("-","m").replace("+","p")
 
-            # Take image difference and create new ImageData object
-            diffimPath = f"{fp.dataDir}/stamps/stamp_r{ring:02d}_{xshift:+03d}{yshift:+03d}_diff.fits"
-            diffimPath = diffimPath.replace("-","m").replace("+","p")
-            diffImage = ImageIO.create(
-                data=stampImage2.data-stampImage1.data,
-                header=image2.header,
-                save_to=diffimPath
-            )
-            diffStamps.append(diffImage)
+#             # Create new ImageData object for stamp
+#             stampXcen = xcen + xshift*cs
+#             stampYcen = ycen + yshift*cs
+#             stampImage1 = ImageIO.create(
+#                 data=image1.data[
+#                     int(stampYcen-cs/2):int(stampYcen+cs/2),
+#                     int(stampXcen-cs/2):int(stampXcen+cs/2)
+#                 ],
+#                 #save_to=stampPath1
+#             )
+#             stampImage2 = ImageIO.create(
+#                 data=image2.data[
+#                     int(stampYcen-cs/2):int(stampYcen+cs/2),
+#                     int(stampXcen-cs/2):int(stampXcen+cs/2)
+#                 ],
+#                 #save_to=stampPath2
+#             )
+#             rawStamps1.append(stampImage1)
+#             rawStamps2.append(stampImage2)
+
+#             # Take image difference and create new ImageData object
+#             diffimPath = f"{fp.dataDir}/stamps/stamp_r{ring:02d}_{xshift:+03d}{yshift:+03d}_diff.fits"
+#             diffimPath = diffimPath.replace("-","m").replace("+","p")
+#             diffImage = ImageIO.create(
+#                 data=stampImage2.data-stampImage1.data,
+#                 header=image2.header,
+#                 save_to=diffimPath
+#             )
+#             diffStamps.append(diffImage)
             
-            # # Check whether stamp already exists
-            # if os.path.isfile(stampPath2):
-            #     stampImage2 = ImageIO.load(stampPath2)
-            #     if 'PLTSOLVD' in stampImage2.header.keys():
-            #         solvedStamps.append(stampImage2)
-            #     else:
-            #         rawStamps.append(stampImage2)
-            # else:
-            #     # Create new ImageData object for stamp
-            #     stampXcen = xcen + xshift*cs
-            #     stampYcen = ycen + yshift*cs
-            #     stampImage2 = ImageIO.create(
-            #         data=image2.data[
-            #             int(stampYcen-cs/2):int(stampYcen+cs/2),
-            #             int(stampXcen-cs/2):int(stampXcen+cs/2)
-            #         ],
-            #         save_to=stampPath2
-            #     )
-            #     rawStamps.append(stampImage2)
+#             # # Check whether stamp already exists
+#             # if os.path.isfile(stampPath2):
+#             #     stampImage2 = ImageIO.load(stampPath2)
+#             #     if 'PLTSOLVD' in stampImage2.header.keys():
+#             #         solvedStamps.append(stampImage2)
+#             #     else:
+#             #         rawStamps.append(stampImage2)
+#             # else:
+#             #     # Create new ImageData object for stamp
+#             #     stampXcen = xcen + xshift*cs
+#             #     stampYcen = ycen + yshift*cs
+#             #     stampImage2 = ImageIO.create(
+#             #         data=image2.data[
+#             #             int(stampYcen-cs/2):int(stampYcen+cs/2),
+#             #             int(stampXcen-cs/2):int(stampXcen+cs/2)
+#             #         ],
+#             #         save_to=stampPath2
+#             #     )
+#             #     rawStamps.append(stampImage2)
 
 
 # Perform streak detection on difference images
