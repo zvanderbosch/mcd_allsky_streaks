@@ -11,10 +11,11 @@ import sys
 from pathlib import Path
 sys.path.insert(0, "./src")
 
+# For linux platforms using wayland
 if sys.platform.startswith("linux") and os.environ.get("XDG_SESSION_TYPE") == "wayland":
     os.environ.setdefault("QT_QPA_PLATFORM", "wayland")
 
-import napari  # noqa: E402  (must come after the environment variable is set)
+import napari
 import numpy as np
 from astropy.io import fits
 from astropy.stats import sigma_clipped_stats
@@ -28,16 +29,15 @@ from magicgui.widgets import (
 )
 from napari.utils.notifications import show_error, show_info
 
-FITS_SUFFIXES = {".fits", ".fit", ".fts", ".fz"}
-
 
 def find_files(args):
     """Turn command-line arguments (files and/or folders) into a sorted file list."""
+    fitsSuffixes = [".fits", ".fit", ".fts", ".fz"]
     files = []
     for arg in args:
         p = Path(arg)
         if p.is_dir():
-            files += [f for f in p.iterdir() if f.suffix.lower() in FITS_SUFFIXES]
+            files += [f for f in p.iterdir() if f.suffix.lower() in fitsSuffixes]
         elif p.is_file():
             files.append(p)
     return sorted(files)
@@ -57,8 +57,7 @@ def load_fits(path):
 
 # ---------------------------------------------------------------------------
 # Detector adapters. Each takes the 2D image plus keyword parameters and returns
-# a list of line segments (x0, y0, x1, y1), with x = column and y = row, in
-# image pixel coordinates. Wrap your own functions in this form.
+# a list of line segments (x0, y0, x1, y1), in image pixel coordinates.
 # ---------------------------------------------------------------------------
 
 def houghDetector(
@@ -171,19 +170,19 @@ class FitsBrowser:
 
         self.files = files
         self.index = 0
-        self.annotations = {}     # path -> (shape data, shape types, edge widths)
+        self.annotations = {}     # path -> (shape data, shape types, edge widths, edge colors)
         self.current_path = None  # image currently displayed
 
         self.viewer = napari.Viewer()
         first = load_fits(files[0])
         self.layer = self.viewer.add_image(first, name="image")
 
-        # Add a shape layer for streak labeling using "add_polyline" as default tool
+        # Add a shape layer for streak labeling. Default tool = "add_polyline"
         self.shapes_layer = self.viewer.add_shapes(
             name="streaks",
             ndim=2,
             edge_width=8,
-            edge_color="red",
+            edge_color="green",
             face_color="transparent",
             opacity=0.3,
         )
@@ -219,6 +218,7 @@ class FitsBrowser:
                 [np.array(s) for s in layer.data],
                 list(layer.shape_type),
                 list(layer.edge_width),
+                np.array(layer.edge_color),
             )
 
         # Set path/index/data for the new image being displayed
@@ -227,13 +227,13 @@ class FitsBrowser:
         data = load_fits(path)
         self.current_path = path
 
-        # Clear the layer, then restore this image's shapes (if any).
+        # Clear the shape layer, then restore this image's shapes (if any).
         layer.selected_data = set(range(layer.nshapes))
         layer.remove_selected()
         saved = self.annotations.get(path)
         if saved and saved[0]:
-            shapes, types, widths = saved
-            layer.add(shapes, shape_type=types, edge_width=widths, edge_color="red")
+            shapes, types, widths, colors = saved
+            layer.add(shapes, shape_type=types, edge_width=widths, edge_color=colors)
 
         # Set the display range from percentiles so faint streaks are visible.
         lo, hi = np.nanpercentile(data, [1, 99.5])
@@ -241,16 +241,17 @@ class FitsBrowser:
         self.layer.contrast_limits_range = (float(np.nanmin(data)), float(np.nanmax(data)))
         self.layer.contrast_limits = (float(lo), float(hi))
         self.layer.name = path.name
-
+        
         self.label.value = f"{self.index + 1} / {len(self.files)}\n{path.name}"
         self.viewer.title = path.name
 
-    def add_detector(self, name, detect_func, params):
+    def add_detector(self, name, detect_func, params, color="red"):
         """Add a dock panel with parameter fields and a Run button for a detector.
 
         detect_func(image, **params) -> list of (x0, y0, x1, y1) segments.
         params maps each argument name to a dict with value/min/max/step. An int
         `value` gives an integer field; a float gives a decimal field.
+        color is the edge color used for this detector's lines.
         """
         fields = {}
         for pname, spec in params.items():
@@ -275,7 +276,7 @@ class FitsBrowser:
             except Exception as exc:
                 show_error(f"{name} failed: {exc}")
                 return
-            self.add_segments(segments, name, replace=replace.value)
+            self.add_segments(segments, color, replace=replace.value)
             show_info(f"{name}: {len(segments)} line(s) found")
 
         run.changed.connect(on_run)
@@ -283,17 +284,10 @@ class FitsBrowser:
         self.viewer.window.add_dock_widget(panel, area="right", name=name)
 
 
-    def add_segments(self, segments, dname, replace=True):
+    def add_segments(self, segments, color="red", replace=True):
         """
         Draw (x0, y0, x1, y1) segments on the shapes layer (napari uses row, col).
         """
-
-        # Select color by detecor name
-        if dname == "Hough Detector":
-            ecolor = "red"
-        elif dname == "PyRadon Detector":
-            ecolor = "blue"
-
         layer = self.shapes_layer
         if replace:
             layer.selected_data = set(range(layer.nshapes))
@@ -304,7 +298,7 @@ class FitsBrowser:
                 lines, 
                 shape_type="line",
                 edge_width=layer.current_edge_width, 
-                edge_color=ecolor
+                edge_color=color
             )
 
 
@@ -334,6 +328,7 @@ if __name__ == "__main__":
             "hough_threshold":dict(value=100, min=5, max=1_000, step=5),
             "angle_steps":dict(value=360, min=30, max=720, step=30)
         },
+        color="red",
     )
     browser.add_detector(
         "PyRadon Detector",
@@ -342,6 +337,7 @@ if __name__ == "__main__":
             "psf":dict(value=3.0, min=1.0, max=10.0, step=0.25), 
             "threshold":dict(value=10.0, min=1.0, max=100.0, step=1.0)
         },
+        color="blue",
     )
 
     # Run napari
