@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Mapping, Tuple, Literal
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.table import Table
@@ -112,6 +112,100 @@ class ImageIO:
             header=header,
             path=save_to
         )
+    
+    def makeStamps(
+            image1: ImageData,
+            image2: ImageData,
+            stampSize: int,
+            numRings: int,
+            diffType: Literal["2-1","1-2"] = "2-1",
+            xyCenter: Tuple[int,int] | None = None,
+            saveStamps: bool = False
+        ) -> list:
+        """
+        Function to create difference image stamps
+        """
+
+        # Define directory to save stamps in
+        stampDir = f"{fp.dataDir}/stamps"
+
+        # Get image X,Y central pixel coordinates
+        if xyCenter is None:
+            ydim,xdim = image1.data.shape
+            xcen = np.floor(xdim/2)+1
+            ycen = np.floor(ydim/2)+1
+        else:
+            xcen = xyCenter[0]
+            ycen = xyCenter[1]
+
+
+        # Lists to store difference images in
+        diffStamps = []
+
+        # Iterate over each stamp, starting with central ring and moving outward
+        for ring in range(numRings):
+            for xshift in range(-ring,ring+1):
+                for yshift in range(-ring,ring+1):
+
+                    # Make sure the stamp belongs to the current ring
+                    if (abs(xshift) < ring) and (abs(yshift) < ring):
+                        continue
+
+                    # Get center and extent of the current stamp
+                    # X = column dimension, Y = row dimension
+                    stampXcen = xcen + xshift*stampSize
+                    stampYcen = ycen + yshift*stampSize
+                    stampX0 = int(stampXcen-stampSize/2) 
+                    stampX1 = int(stampXcen+stampSize/2)
+                    stampY0 = int(stampYcen-stampSize/2)
+                    stampY1 = int(stampYcen+stampSize/2)
+
+
+                    # Create new ImageData object for stamp
+                    stampXcen = xcen + xshift*stampSize
+                    stampYcen = ycen + yshift*stampSize
+                    stampImage1 = ImageIO.create(
+                        data=image1.data[
+                            stampY0:stampY1, stampX0:stampX1,
+                        ]
+                    )
+                    stampImage2 = ImageIO.create(
+                        data=image2.data[
+                            stampY0:stampY1, stampX0:stampX1,
+                        ]
+                    )
+
+                    # Define path for saved stamp FITS file
+                    if saveStamps:
+                        diffimPath = f"{stampDir}/stamp_r{ring:02d}_{xshift:+03d}{yshift:+03d}_diff.fits"
+                        diffimPath = diffimPath.replace("-","m").replace("+","p")
+                    else:
+                        diffimPath = None
+
+                    # Calculate the difference image data array
+                    stampData1 = stampImage1.data - np.nanmean(stampImage1.data)
+                    stampData2 = stampImage2.data - np.nanmean(stampImage2.data)
+                    if diffType == "2-1":
+                        diffData = stampData2 - stampData1
+                    elif diffType == "1-2":
+                        diffData = stampData1 - stampData2
+
+                    # Generate the difference image header
+                    diffHDR = image2.header
+                    diffHDR['X0'] = stampX0
+                    diffHDR['Y0'] = stampY0
+                    diffHDR['X1'] = stampX1
+                    diffHDR['Y1'] = stampY1
+
+                    # Combine into an ImageData object and save to file
+                    diffImage = ImageIO.create(
+                        data=diffData,
+                        header=diffHDR,
+                        save_to=diffimPath
+                    )
+                    diffStamps.append(diffImage)
+
+        return diffStamps
     
 
 class PlateSolve:
